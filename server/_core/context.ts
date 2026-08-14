@@ -1,6 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 import * as db from "../db";
 
 export type TrpcContext = {
@@ -19,6 +19,7 @@ export async function createContext(
 
   if (token) {
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase.auth.getUser(token);
       if (!error && data.user) {
         const profile = await db.getOrSyncUserProfile(data.user.id, {
@@ -28,7 +29,10 @@ export async function createContext(
         user = profile ?? null;
       }
     } catch (error) {
-      // Token inválido/expirado — trata como não autenticado.
+      // Token inválido/expirado OU Supabase mal configurado — trata como não
+      // autenticado em vez de derrubar a requisição inteira. A mensagem real
+      // fica no log do servidor pra facilitar diagnóstico.
+      console.error("[Auth] Falha ao validar sessão:", error instanceof Error ? error.message : error);
       user = null;
     }
   }
