@@ -9,10 +9,11 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const client = postgres(process.env.DATABASE_URL, { prepare: false });
+      const client = postgres(process.env.DATABASE_URL, { prepare: false, ssl: "require" });
       _db = drizzle(client);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      const cause = error instanceof Error && error.cause ? ` | causa: ${error.cause instanceof Error ? error.cause.message : String(error.cause)}` : "";
+      console.warn("[Database] Failed to connect:", error instanceof Error ? error.message + cause : error);
       _db = null;
     }
   }

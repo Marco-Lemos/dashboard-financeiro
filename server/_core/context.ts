@@ -29,10 +29,14 @@ export async function createContext(
         user = profile ?? null;
       }
     } catch (error) {
-      // Token inválido/expirado OU Supabase mal configurado — trata como não
-      // autenticado em vez de derrubar a requisição inteira. A mensagem real
-      // fica no log do servidor pra facilitar diagnóstico.
-      console.error("[Auth] Falha ao validar sessão:", error instanceof Error ? error.message : error);
+      // Token inválido/expirado OU Supabase/banco mal configurado — trata como
+      // não autenticado em vez de derrubar a requisição inteira. error.cause
+      // costuma ter a causa real (ex: erro de autenticação do Postgres),
+      // enquanto error.message às vezes só mostra um wrapper genérico.
+      const cause = error instanceof Error && error.cause
+        ? ` | causa: ${error.cause instanceof Error ? error.cause.message : String(error.cause)}`
+        : "";
+      console.error("[Auth] Falha ao validar sessão:", error instanceof Error ? error.message + cause : error);
       user = null;
     }
   }
