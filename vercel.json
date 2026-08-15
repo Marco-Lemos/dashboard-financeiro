@@ -1,5 +1,5 @@
 {
-  "buildCommand": "vite build && npx esbuild server/_core/vercel-entry.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "crons": [
