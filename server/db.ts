@@ -157,3 +157,10 @@ export async function deleteInstallment(id: number, userId: string) {
   if (!db) throw new Error("Database not available");
   return db.delete(installments).where(and(eq(installments.id, id), eq(installments.userId, userId)));
 }
+
+// Onboarding
+export async function completeOnboarding(userId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(users).set({ onboardingCompleted: true }).where(eq(users.id, userId));
+}

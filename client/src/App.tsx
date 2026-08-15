@@ -14,6 +14,7 @@ import FixedAccounts from "./pages/FixedAccounts";
 import Installments from "./pages/Installments";
 import Categories from "./pages/Categories";
 import Login from "./pages/Login";
+import Onboarding from "./pages/Onboarding";
 
 function Router() {
   useHashLocation();
@@ -33,7 +34,7 @@ function Router() {
 // Só libera a navegação normal depois que existe uma sessão válida do Supabase Auth.
 // Sem isso, qualquer pessoa acessaria as telas antes mesmo de logar.
 function AppShell() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -45,6 +46,10 @@ function AppShell() {
 
   if (!isAuthenticated) {
     return <Login />;
+  }
+
+  if (user && !user.onboardingCompleted) {
+    return <Onboarding />;
   }
 
   return (

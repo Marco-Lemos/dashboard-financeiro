@@ -7,6 +7,7 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    completeOnboarding: protectedProcedure.mutation(({ ctx }) => db.completeOnboarding(ctx.user.id)),
   }),
 
   finance: router({

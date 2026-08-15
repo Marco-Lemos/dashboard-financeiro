@@ -65,7 +65,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 // drizzle/schema.ts
-import { pgTable, uuid, text, timestamp, varchar, decimal, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, varchar, decimal, integer, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 var userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 var transactionTypeEnum = pgEnum("transaction_type", ["receita", "despesa", "investimento"]);
@@ -76,6 +76,7 @@ var users = pgTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   role: userRoleEnum("role").default("user").notNull(),
+  onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -267,12 +268,18 @@ async function deleteInstallment(id, userId) {
   if (!db) throw new Error("Database not available");
   return db.delete(installments).where(and(eq(installments.id, id), eq(installments.userId, userId)));
 }
+async function completeOnboarding(userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(users).set({ onboardingCompleted: true }).where(eq(users.id, userId));
+}
 
 // server/routers.ts
 var appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user)
+    me: publicProcedure.query((opts) => opts.ctx.user),
+    completeOnboarding: protectedProcedure.mutation(({ ctx }) => completeOnboarding(ctx.user.id))
   }),
   finance: router({
     transactions: router({

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, varchar, decimal, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, varchar, decimal, integer, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   role: userRoleEnum("role").default("user").notNull(),
+  onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
