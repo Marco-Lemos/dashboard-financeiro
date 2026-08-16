@@ -4,7 +4,6 @@ import { relations } from "drizzle-orm";
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const transactionTypeEnum = pgEnum("transaction_type", ["receita", "despesa", "investimento"]);
 export const categoryTypeEnum = pgEnum("category_type", ["receita", "despesa", "investimento"]);
-export const fixedAccountStatusEnum = pgEnum("fixed_account_status", ["pago", "pendente"]);
 
 /**
  * Tabela de perfis, espelhando auth.users (Supabase Auth).
@@ -34,6 +33,10 @@ export const transactions = pgTable("transactions", {
   type: transactionTypeEnum("type").notNull(),
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date", { withTimezone: true }).notNull(),
+  // Preenchido quando a transação foi criada ao marcar uma conta fixa como paga.
+  // Assim dá pra saber, por mês, se aquela conta fixa já foi paga ou está em aberto,
+  // sem precisar de um status estático (que não tinha noção de "pago em qual mês").
+  fixedAccountId: integer("fixedAccountId").references(() => fixedAccounts.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -60,7 +63,6 @@ export const fixedAccounts = pgTable("fixedAccounts", {
   name: varchar("name", { length: 128 }).notNull(),
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
   dueDay: integer("dueDay").notNull(),
-  status: fixedAccountStatusEnum("status").default("pendente").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });

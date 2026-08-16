@@ -19,6 +19,7 @@ export const appRouter = router({
         type: z.enum(["receita", "despesa", "investimento"]),
         amount: z.number(),
         date: z.string().transform(s => new Date(s)),
+        fixedAccountId: z.number().optional(),
       })).mutation(({ ctx, input }) => db.createTransaction({
         userId: ctx.user.id,
         description: input.description,
@@ -26,6 +27,7 @@ export const appRouter = router({
         type: input.type,
         value: input.amount.toString(),
         date: input.date,
+        fixedAccountId: input.fixedAccountId,
       })),
       update: protectedProcedure.input(z.object({
         id: z.coerce.number(),
@@ -73,25 +75,21 @@ export const appRouter = router({
         name: z.string(),
         value: z.string(),
         dueDay: z.number(),
-        status: z.enum(["pago", "pendente"]),
       })).mutation(({ ctx, input }) => db.createFixedAccount({
         userId: ctx.user.id,
         name: input.name,
         value: input.value as any,
         dueDay: input.dueDay,
-        status: input.status,
       })),
       update: protectedProcedure.input(z.object({
         id: z.coerce.number(),
         name: z.string().optional(),
         value: z.string().optional(),
         dueDay: z.number().optional(),
-        status: z.enum(["pago", "pendente"]).optional(),
       })).mutation(({ ctx, input }) => db.updateFixedAccount(input.id, ctx.user.id, {
         name: input.name,
         value: input.value as any,
         dueDay: input.dueDay,
-        status: input.status,
       })),
       delete: protectedProcedure.input(z.object({ id: z.coerce.number() })).mutation(({ ctx, input }) => db.deleteFixedAccount(input.id, ctx.user.id)),
     }),

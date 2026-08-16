@@ -70,7 +70,6 @@ import { relations } from "drizzle-orm";
 var userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 var transactionTypeEnum = pgEnum("transaction_type", ["receita", "despesa", "investimento"]);
 var categoryTypeEnum = pgEnum("category_type", ["receita", "despesa", "investimento"]);
-var fixedAccountStatusEnum = pgEnum("fixed_account_status", ["pago", "pendente"]);
 var users = pgTable("users", {
   id: uuid("id").primaryKey(),
   name: text("name"),
@@ -88,6 +87,10 @@ var transactions = pgTable("transactions", {
   type: transactionTypeEnum("type").notNull(),
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date", { withTimezone: true }).notNull(),
+  // Preenchido quando a transação foi criada ao marcar uma conta fixa como paga.
+  // Assim dá pra saber, por mês, se aquela conta fixa já foi paga ou está em aberto,
+  // sem precisar de um status estático (que não tinha noção de "pago em qual mês").
+  fixedAccountId: integer("fixedAccountId").references(() => fixedAccounts.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
@@ -106,7 +109,6 @@ var fixedAccounts = pgTable("fixedAccounts", {
   name: varchar("name", { length: 128 }).notNull(),
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
   dueDay: integer("dueDay").notNull(),
-  status: fixedAccountStatusEnum("status").default("pendente").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
@@ -289,14 +291,16 @@ var appRouter = router({
         category: z2.string(),
         type: z2.enum(["receita", "despesa", "investimento"]),
         amount: z2.number(),
-        date: z2.string().transform((s) => new Date(s))
+        date: z2.string().transform((s) => new Date(s)),
+        fixedAccountId: z2.number().optional()
       })).mutation(({ ctx, input }) => createTransaction({
         userId: ctx.user.id,
         description: input.description,
         category: input.category,
         type: input.type,
         value: input.amount.toString(),
-        date: input.date
+        date: input.date,
+        fixedAccountId: input.fixedAccountId
       })),
       update: protectedProcedure.input(z2.object({
         id: z2.coerce.number(),
@@ -341,26 +345,22 @@ var appRouter = router({
       create: protectedProcedure.input(z2.object({
         name: z2.string(),
         value: z2.string(),
-        dueDay: z2.number(),
-        status: z2.enum(["pago", "pendente"])
+        dueDay: z2.number()
       })).mutation(({ ctx, input }) => createFixedAccount({
         userId: ctx.user.id,
         name: input.name,
         value: input.value,
-        dueDay: input.dueDay,
-        status: input.status
+        dueDay: input.dueDay
       })),
       update: protectedProcedure.input(z2.object({
         id: z2.coerce.number(),
         name: z2.string().optional(),
         value: z2.string().optional(),
-        dueDay: z2.number().optional(),
-        status: z2.enum(["pago", "pendente"]).optional()
+        dueDay: z2.number().optional()
       })).mutation(({ ctx, input }) => updateFixedAccount(input.id, ctx.user.id, {
         name: input.name,
         value: input.value,
-        dueDay: input.dueDay,
-        status: input.status
+        dueDay: input.dueDay
       })),
       delete: protectedProcedure.input(z2.object({ id: z2.coerce.number() })).mutation(({ ctx, input }) => deleteFixedAccount(input.id, ctx.user.id))
     }),

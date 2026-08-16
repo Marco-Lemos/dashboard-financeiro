@@ -154,6 +154,7 @@ export function useFinanceData() {
     category: string;
     type: 'receita' | 'despesa' | 'investimento';
     amount: number;
+    fixedAccountId?: number;
   }) => {
     try {
       await addTransactionMutation.mutateAsync(data);
@@ -290,14 +291,12 @@ export function useFinanceData() {
     name: string;
     value: number;
     dueDay: number;
-    status: 'pago' | 'pendente';
   }) => {
     try {
       await addFixedAccountMutation.mutateAsync({
         name: data.name,
         value: data.value.toString(),
         dueDay: data.dueDay,
-        status: data.status,
       });
     } catch (error) {
       console.error('Erro ao adicionar conta fixa:', error);
@@ -309,7 +308,6 @@ export function useFinanceData() {
     name: string;
     value: number;
     dueDay: number;
-    status: 'pago' | 'pendente';
   }) => {
     try {
       await updateFixedAccountMutation.mutateAsync({
@@ -317,7 +315,6 @@ export function useFinanceData() {
         name: data.name,
         value: data.value.toString(),
         dueDay: data.dueDay,
-        status: data.status,
       });
     } catch (error) {
       console.error('Erro ao atualizar conta fixa:', error);
@@ -333,6 +330,41 @@ export function useFinanceData() {
       throw error;
     }
   }, [deleteFixedAccountMutation]);
+
+  // Marcar uma conta fixa como paga NO MÊS SELECIONADO cria uma transação de
+  // despesa de verdade, ligada a ela — é isso que faz o valor entrar no
+  // orçamento do mês. Enquanto não for marcada, ela fica só "em aberto" e não
+  // conta em receitas/despesas/saldo.
+  const payFixedAccount = useCallback(async (account: { id: number; name: string; value: number | string; dueDay: number }) => {
+    const value = typeof account.value === 'string' ? parseFloat(account.value) : account.value;
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const day = Math.min(account.dueDay, daysInMonth);
+    const paidDate = new Date(selectedYear, selectedMonth, day).toISOString().split('T')[0];
+
+    try {
+      await addTransactionMutation.mutateAsync({
+        description: account.name,
+        category: account.name,
+        type: 'despesa',
+        amount: value,
+        date: paidDate,
+        fixedAccountId: account.id,
+      });
+    } catch (error) {
+      console.error('Erro ao marcar conta fixa como paga:', error);
+      throw error;
+    }
+  }, [addTransactionMutation, selectedMonth, selectedYear]);
+
+  // Desfaz o pagamento: apaga a transação vinculada, a conta volta a ficar em aberto.
+  const unpayFixedAccount = useCallback(async (transactionId: number) => {
+    try {
+      await deleteTransactionMutation.mutateAsync({ id: transactionId });
+    } catch (error) {
+      console.error('Erro ao desfazer pagamento da conta fixa:', error);
+      throw error;
+    }
+  }, [deleteTransactionMutation]);
 
   return {
     selectedMonth,
@@ -364,5 +396,7 @@ export function useFinanceData() {
     addFixedAccount,
     updateFixedAccount,
     deleteFixedAccount,
+    payFixedAccount,
+    unpayFixedAccount,
   };
 }
