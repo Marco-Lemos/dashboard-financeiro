@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -8,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { Navigation } from "./components/Navigation";
 import { MonthProvider } from "./contexts/MonthContext";
 import { useAuth } from "./_core/hooks/useAuth";
+import { FinancialStory, hasSeenStoryToday } from "./components/FinancialStory";
 import Home from "./pages/Home";
 import Transactions from "./pages/Transactions";
 import FixedAccounts from "./pages/FixedAccounts";
@@ -56,8 +58,26 @@ function AppShell() {
     <>
       <Navigation />
       <Router />
+      {user && <StoryOverlay userId={user.id} />}
     </>
   );
+}
+
+// Mostra o recap animado uma vez por dia, por cima do painel (que já carrega
+// normalmente por baixo). Não bloqueia nada — some ao terminar ou ao pular.
+function StoryOverlay({ userId }: { userId: string }) {
+  const [visible, setVisible] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!checked) {
+      setVisible(!hasSeenStoryToday(userId));
+      setChecked(true);
+    }
+  }, [checked, userId]);
+
+  if (!visible) return null;
+  return <FinancialStory onDismiss={() => setVisible(false)} />;
 }
 
 function App() {
