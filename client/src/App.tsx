@@ -57,7 +57,9 @@ function AppShell() {
   return (
     <>
       <Navigation />
-      <Router />
+      <div className="pb-20 md:pb-0">
+        <Router />
+      </div>
       {user && <StoryOverlay userId={user.id} />}
     </>
   );
