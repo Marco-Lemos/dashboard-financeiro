@@ -58,10 +58,13 @@ export function useFinanceData() {
 
   const allCategories = categoriesData;
 
-  // Filtrar transações por mês e ano selecionado
+  // Filtrar transações por mês e ano selecionado.
+  // Usa getUTC* porque a data é salva ancorada em meia-noite UTC — ler com
+  // getMonth()/getFullYear() (fuso local) empurra o dia pro anterior em
+  // qualquer fuso atrás de UTC, como o do Brasil.
   const filteredTransactions = transactionsData.filter(transaction => {
     const transDate = new Date(transaction.date);
-    return transDate.getMonth() === selectedMonth && transDate.getFullYear() === selectedYear;
+    return transDate.getUTCMonth() === selectedMonth && transDate.getUTCFullYear() === selectedYear;
   });
 
   // Calcular receitas, despesas e investimentos do mês
@@ -95,7 +98,7 @@ export function useFinanceData() {
 
     const monthTransactions = transactionsData.filter(t => {
       const tDate = new Date(t.date);
-      return tDate.getMonth() === month && tDate.getFullYear() === year;
+      return tDate.getUTCMonth() === month && tDate.getUTCFullYear() === year;
     });
 
     const monthReceitas = monthTransactions

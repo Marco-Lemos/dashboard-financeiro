@@ -187,7 +187,7 @@ export default function Transactions() {
                             className="glass-card border-border"
                           />
                         ) : (
-                          new Date(transaction.date).toLocaleDateString('pt-BR')
+                          new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm">

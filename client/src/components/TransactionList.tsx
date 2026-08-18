@@ -110,6 +110,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                         {new Date(transaction.date).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: 'short',
+                          timeZone: 'UTC',
                         })}
                       </span>
                     </div>
