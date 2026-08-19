@@ -20,6 +20,7 @@ export const appRouter = router({
         amount: z.number(),
         date: z.string().transform(s => new Date(s)),
         fixedAccountId: z.number().optional(),
+        goalId: z.number().optional(),
       })).mutation(({ ctx, input }) => db.createTransaction({
         userId: ctx.user.id,
         description: input.description,
@@ -28,6 +29,7 @@ export const appRouter = router({
         value: input.amount.toString(),
         date: input.date,
         fixedAccountId: input.fixedAccountId,
+        goalId: input.goalId,
       })),
       update: protectedProcedure.input(z.object({
         id: z.coerce.number(),
@@ -133,6 +135,35 @@ export const appRouter = router({
         paidUntilYear: input.paidUntilYear,
       })),
       delete: protectedProcedure.input(z.object({ id: z.coerce.number() })).mutation(({ ctx, input }) => db.deleteInstallment(input.id, ctx.user.id)),
+    }),
+
+    goals: router({
+      list: protectedProcedure.query(({ ctx }) => db.getUserGoals(ctx.user.id)),
+      create: protectedProcedure.input(z.object({
+        name: z.string(),
+        targetValue: z.string(),
+        targetMonth: z.number().optional(),
+        targetYear: z.number().optional(),
+      })).mutation(({ ctx, input }) => db.createGoal({
+        userId: ctx.user.id,
+        name: input.name,
+        targetValue: input.targetValue as any,
+        targetMonth: input.targetMonth,
+        targetYear: input.targetYear,
+      })),
+      update: protectedProcedure.input(z.object({
+        id: z.coerce.number(),
+        name: z.string().optional(),
+        targetValue: z.string().optional(),
+        targetMonth: z.number().optional(),
+        targetYear: z.number().optional(),
+      })).mutation(({ ctx, input }) => db.updateGoal(input.id, ctx.user.id, {
+        name: input.name,
+        targetValue: input.targetValue as any,
+        targetMonth: input.targetMonth,
+        targetYear: input.targetYear,
+      })),
+      delete: protectedProcedure.input(z.object({ id: z.coerce.number() })).mutation(({ ctx, input }) => db.deleteGoal(input.id, ctx.user.id)),
     }),
   }),
 });

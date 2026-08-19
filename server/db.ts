@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { users, transactions, categories, fixedAccounts, installments, User, Transaction, Category, FixedAccount, Installment, InsertTransaction, InsertCategory, InsertFixedAccount, InsertInstallment } from "../drizzle/schema";
+import { users, transactions, categories, fixedAccounts, installments, goals, User, Transaction, Category, FixedAccount, Installment, Goal, InsertTransaction, InsertCategory, InsertFixedAccount, InsertInstallment, InsertGoal } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -163,4 +163,29 @@ export async function completeOnboarding(userId: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(users).set({ onboardingCompleted: true }).where(eq(users.id, userId));
+}
+
+// Metas financeiras
+export async function getUserGoals(userId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(goals).where(eq(goals.userId, userId));
+}
+
+export async function createGoal(data: InsertGoal) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(goals).values(data);
+}
+
+export async function updateGoal(id: number, userId: string, data: Partial<Goal>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(goals).set(data).where(and(eq(goals.id, id), eq(goals.userId, userId)));
+}
+
+export async function deleteGoal(id: number, userId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(goals).where(and(eq(goals.id, id), eq(goals.userId, userId)));
 }

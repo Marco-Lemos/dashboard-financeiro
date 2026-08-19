@@ -37,6 +37,9 @@ export const transactions = pgTable("transactions", {
   // Assim dá pra saber, por mês, se aquela conta fixa já foi paga ou está em aberto,
   // sem precisar de um status estático (que não tinha noção de "pago em qual mês").
   fixedAccountId: integer("fixedAccountId").references(() => fixedAccounts.id, { onDelete: "set null" }),
+  // Preenchido quando a transação é uma contribuição pra uma meta financeira.
+  // Progresso da meta = soma de tudo que aponta pra ela, mesma lógica das contas fixas.
+  goalId: integer("goalId").references(() => goals.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -86,6 +89,20 @@ export const installments = pgTable("installments", {
 
 export type Installment = typeof installments.$inferSelect;
 export type InsertInstallment = typeof installments.$inferInsert;
+
+export const goals = pgTable("goals", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 128 }).notNull(),
+  targetValue: decimal("targetValue", { precision: 10, scale: 2 }).notNull(),
+  targetMonth: integer("targetMonth"),
+  targetYear: integer("targetYear"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Goal = typeof goals.$inferSelect;
+export type InsertGoal = typeof goals.$inferInsert;
 
 // Relações
 export const usersRelations = relations(users, ({ many }) => ({

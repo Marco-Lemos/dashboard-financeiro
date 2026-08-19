@@ -14,6 +14,7 @@ export function useFinanceData() {
   const { data: categoriesData = [], isLoading: categoriesLoading } = trpc.finance.categories.list.useQuery();
   const { data: installmentsData = [], isLoading: installmentsLoading } = trpc.finance.installments.list.useQuery();
   const { data: fixedAccountsData = [], isLoading: fixedAccountsLoading } = trpc.finance.fixedAccounts.list.useQuery();
+  const { data: goalsData = [], isLoading: goalsLoading } = trpc.finance.goals.list.useQuery();
 
   // Mutations — cada uma invalida a query correspondente para a UI refletir a mudança sem precisar recarregar a página
   const addTransactionMutation = trpc.finance.transactions.create.useMutation({
@@ -54,6 +55,16 @@ export function useFinanceData() {
   });
   const deleteFixedAccountMutation = trpc.finance.fixedAccounts.delete.useMutation({
     onSuccess: () => utils.finance.fixedAccounts.list.invalidate(),
+  });
+
+  const addGoalMutation = trpc.finance.goals.create.useMutation({
+    onSuccess: () => utils.finance.goals.list.invalidate(),
+  });
+  const updateGoalMutation = trpc.finance.goals.update.useMutation({
+    onSuccess: () => utils.finance.goals.list.invalidate(),
+  });
+  const deleteGoalMutation = trpc.finance.goals.delete.useMutation({
+    onSuccess: () => utils.finance.goals.list.invalidate(),
   });
 
   const allCategories = categoriesData;
@@ -158,6 +169,7 @@ export function useFinanceData() {
     type: 'receita' | 'despesa' | 'investimento';
     amount: number;
     fixedAccountId?: number;
+    goalId?: number;
   }) => {
     try {
       await addTransactionMutation.mutateAsync(data);
@@ -369,6 +381,76 @@ export function useFinanceData() {
     }
   }, [deleteTransactionMutation]);
 
+  // Metas financeiras
+  const addGoal = useCallback(async (data: { name: string; targetValue: number; targetMonth?: number; targetYear?: number }) => {
+    try {
+      await addGoalMutation.mutateAsync({
+        name: data.name,
+        targetValue: data.targetValue.toString(),
+        targetMonth: data.targetMonth,
+        targetYear: data.targetYear,
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar meta:', error);
+      throw error;
+    }
+  }, [addGoalMutation]);
+
+  const updateGoal = useCallback(async (id: number, data: { name: string; targetValue: number; targetMonth?: number; targetYear?: number }) => {
+    try {
+      await updateGoalMutation.mutateAsync({
+        id,
+        name: data.name,
+        targetValue: data.targetValue.toString(),
+        targetMonth: data.targetMonth,
+        targetYear: data.targetYear,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar meta:', error);
+      throw error;
+    }
+  }, [updateGoalMutation]);
+
+  const deleteGoal = useCallback(async (id: number) => {
+    try {
+      await deleteGoalMutation.mutateAsync({ id });
+    } catch (error) {
+      console.error('Erro ao deletar meta:', error);
+      throw error;
+    }
+  }, [deleteGoalMutation]);
+
+  // Contribuir com uma meta cria uma transação de investimento de verdade,
+  // ligada a ela — mesmo padrão das contas fixas. O progresso nunca desalinha
+  // da realidade porque é sempre a soma dessas transações, nunca um número solto.
+  const contributeToGoal = useCallback(async (goalId: number, amount: number, goalName: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      await addTransactionMutation.mutateAsync({
+        description: `Meta: ${goalName}`,
+        category: goalName,
+        type: 'investimento',
+        amount,
+        date: today,
+        goalId,
+      });
+    } catch (error) {
+      console.error('Erro ao contribuir com a meta:', error);
+      throw error;
+    }
+  }, [addTransactionMutation]);
+
+  // Cada meta acompanhada do quanto já foi contribuído (soma de todas as
+  // transações ligadas a ela, em qualquer mês) e do percentual concluído.
+  const goalsWithProgress = goalsData.map((goal: any) => {
+    const target = typeof goal.targetValue === 'string' ? parseFloat(goal.targetValue) : goal.targetValue;
+    const currentValue = transactionsData
+      .filter((t: any) => t.goalId === goal.id)
+      .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+    const percentage = target > 0 ? Math.min(100, (currentValue / target) * 100) : 0;
+    return { ...goal, targetValue: target, currentValue, percentage };
+  });
+
   return {
     selectedMonth,
     selectedYear,
@@ -386,7 +468,8 @@ export function useFinanceData() {
     allCategories,
     installments: installmentsData,
     fixedAccounts: fixedAccountsData,
-    isLoading: transactionsLoading || categoriesLoading || installmentsLoading || fixedAccountsLoading,
+    goals: goalsWithProgress,
+    isLoading: transactionsLoading || categoriesLoading || installmentsLoading || fixedAccountsLoading || goalsLoading,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -401,5 +484,9 @@ export function useFinanceData() {
     deleteFixedAccount,
     payFixedAccount,
     unpayFixedAccount,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    contributeToGoal,
   };
 }

@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { AnimatePresence, animate, motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, X, TrendingUp, TrendingDown, Wallet, PiggyBank } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X, TrendingUp, TrendingDown, Wallet, PiggyBank, Target } from 'lucide-react';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { MONTHS } from '@/types/finance';
@@ -80,16 +80,22 @@ interface FinancialStoryProps {
 
 export function FinancialStory({ onDismiss }: FinancialStoryProps) {
   const { user } = useAuth();
-  const { receitas, despesas, saldo, economia, categoryExpenses, selectedMonth } = useFinanceData();
+  const { receitas, despesas, saldo, economia, categoryExpenses, goals, selectedMonth } = useFinanceData();
 
   const topCategory = [...categoryExpenses].sort((a, b) => b.value - a.value)[0];
+  // Destaca a meta com maior progresso — é a mais motivadora de mostrar,
+  // concluída ou quase.
+  const featuredGoal = [...goals].sort((a: any, b: any) => b.percentage - a.percentage)[0];
   const firstName = user?.name?.split(' ')[0] || '';
   const monthName = MONTHS[selectedMonth];
 
+  // Primeiro slide já entra com um número (renda do mês) em vez de só
+  // saudação — e o saldo não repete receita, já que ela apareceu ali.
   const slides = [
-    'greeting',
+    'renda',
     'saldo',
     ...(topCategory ? ['maior-gasto'] : []),
+    ...(featuredGoal ? ['meta'] : []),
     'economia',
   ] as const;
 
@@ -159,43 +165,20 @@ export function FinancialStory({ onDismiss }: FinancialStoryProps) {
       <button onClick={goNext} className="absolute right-0 top-0 bottom-0 w-1/3 z-[5]" aria-label="Próximo" />
 
       <AnimatePresence mode="wait">
-        {current === 'greeting' && (
-          <motion.div
-            key="greeting"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 0.4 }}
-            className="relative w-full h-full flex items-center justify-center text-center px-8"
-          >
-            <GlowBackground colorClass="bg-primary" />
-            <div className="relative z-[1]">
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-lg text-muted-foreground mb-3"
-              >
-                {getGreeting()}{firstName ? `, ${firstName}` : ''}
-              </motion.p>
-              <motion.h1
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                className="text-4xl md:text-5xl font-bold font-display tracking-tight"
-              >
-                Vamos ver como está<br />{monthName} pra você
-              </motion.h1>
-            </div>
-          </motion.div>
+        {current === 'renda' && (
+          <RendaSlide key="renda" receitas={receitas} monthName={monthName} firstName={firstName} active={current === 'renda'} />
         )}
 
         {current === 'saldo' && (
-          <SaldoSlide key="saldo" saldo={saldo} receitas={receitas} despesas={despesas} monthName={monthName} active={current === 'saldo'} saldoPositivo={saldoPositivo} />
+          <SaldoSlide key="saldo" saldo={saldo} despesas={despesas} monthName={monthName} active={current === 'saldo'} saldoPositivo={saldoPositivo} />
         )}
 
         {current === 'maior-gasto' && topCategory && (
           <MaiorGastoSlide key="maior-gasto" category={topCategory} despesas={despesas} active={current === 'maior-gasto'} />
+        )}
+
+        {current === 'meta' && featuredGoal && (
+          <MetaSlide key="meta" goal={featuredGoal} active={current === 'meta'} />
         )}
 
         {current === 'economia' && (
@@ -217,8 +200,46 @@ export function FinancialStory({ onDismiss }: FinancialStoryProps) {
   );
 }
 
-function SaldoSlide({ saldo, receitas, despesas, monthName, active, saldoPositivo }: {
-  saldo: number; receitas: number; despesas: number; monthName: string; active: boolean; saldoPositivo: boolean;
+function RendaSlide({ receitas, monthName, firstName, active }: {
+  receitas: number; monthName: string; firstName: string; active: boolean;
+}) {
+  const value = useCountUp(receitas, active, 1.2);
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, x: -40 }}
+      transition={{ duration: 0.4 }}
+      className="relative w-full h-full flex items-center justify-center text-center px-8"
+    >
+      <GlowBackground colorClass="bg-primary" />
+      <div className="relative z-[1]">
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="text-lg text-muted-foreground mb-1"
+        >
+          {getGreeting()}{firstName ? `, ${firstName}` : ''}
+        </motion.p>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-base text-muted-foreground mb-3"
+        >
+          Em {monthName}, entrou
+        </motion.p>
+        <h1 className="text-4xl md:text-6xl font-bold font-display tracking-tight text-primary">
+          {formatBRL(value)}
+        </h1>
+      </div>
+    </motion.div>
+  );
+}
+
+function SaldoSlide({ saldo, despesas, monthName, active, saldoPositivo }: {
+  saldo: number; despesas: number; monthName: string; active: boolean; saldoPositivo: boolean;
 }) {
   const value = useCountUp(Math.abs(saldo), active, 1.2);
   return (
@@ -239,7 +260,7 @@ function SaldoSlide({ saldo, receitas, despesas, monthName, active, saldoPositiv
           </h1>
         </div>
         <p className="text-muted-foreground mt-6 text-sm md:text-base">
-          {formatBRL(receitas)} em receitas · {formatBRL(despesas)} em despesas
+          depois de {formatBRL(despesas)} em despesas
         </p>
       </div>
     </motion.div>
@@ -271,6 +292,47 @@ function MaiorGastoSlide({ category, despesas, active }: {
         <p className="text-muted-foreground mt-6 text-sm md:text-base">
           {pct.toFixed(0)}% de tudo que você gastou este mês
         </p>
+      </div>
+    </motion.div>
+  );
+}
+
+function MetaSlide({ goal, active }: {
+  goal: { name: string; currentValue: number; targetValue: number; percentage: number }; active: boolean;
+}) {
+  const value = useCountUp(goal.currentValue, active, 1.2);
+  const isComplete = goal.percentage >= 100;
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 40 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -40 }}
+      transition={{ duration: 0.4 }}
+      className="relative w-full h-full flex items-center justify-center text-center px-8"
+    >
+      <GlowBackground colorClass="bg-primary" />
+      <div className="relative z-[1] w-full max-w-xs">
+        <Target className="w-10 h-10 mx-auto mb-4 text-primary" />
+        <p className="text-lg text-muted-foreground mb-1">
+          {isComplete ? 'Meta concluída' : 'Sua meta'}
+        </p>
+        <h1 className="text-2xl md:text-3xl font-bold font-display tracking-tight mb-4">
+          {goal.name} {isComplete && '🎉'}
+        </h1>
+        <p className="text-4xl md:text-5xl font-bold font-display">
+          {formatBRL(value)}
+        </p>
+        <p className="text-muted-foreground mt-1 text-sm">de {formatBRL(goal.targetValue)}</p>
+
+        <div className="w-full bg-white/10 rounded-full h-2.5 mt-6">
+          <motion.div
+            className="bg-primary h-2.5 rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: active ? `${goal.percentage}%` : 0 }}
+            transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+          />
+        </div>
+        <p className="text-muted-foreground mt-3 text-sm">{goal.percentage.toFixed(0)}% concluído</p>
       </div>
     </motion.div>
   );
