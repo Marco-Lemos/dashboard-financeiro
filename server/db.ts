@@ -1,7 +1,8 @@
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { users, transactions, categories, fixedAccounts, installments, goals, User, Transaction, Category, FixedAccount, Installment, Goal, InsertTransaction, InsertCategory, InsertFixedAccount, InsertInstallment, InsertGoal } from "../drizzle/schema";
+import { users, transactions, categories, fixedAccounts, installments, goals, investments, User, Transaction, Category, FixedAccount, Installment, Goal, Investment, InsertTransaction, InsertCategory, InsertFixedAccount, InsertInstallment, InsertGoal, InsertInvestment } from "../drizzle/schema";
+import { DEFAULT_CATEGORIES } from "../shared/defaultCategories";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -108,6 +109,20 @@ export async function deleteCategory(id: number, userId: string) {
   return db.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
 }
 
+// Cria as categorias padrão como linhas reais no banco, só se o usuário
+// ainda não tiver nenhuma — assim elas passam a ser editáveis/removíveis
+// como qualquer categoria customizada, sem tratamento especial na tela.
+export async function seedDefaultCategoriesIfEmpty(userId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(categories).where(eq(categories.userId, userId)).limit(1);
+  if (existing.length > 0) return { seeded: false };
+  await db.insert(categories).values(
+    DEFAULT_CATEGORIES.map((c) => ({ userId, name: c.name, type: c.type, color: c.color }))
+  );
+  return { seeded: true };
+}
+
 // Contas Fixas
 export async function getUserFixedAccounts(userId: string) {
   const db = await getDb();
@@ -188,4 +203,29 @@ export async function deleteGoal(id: number, userId: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.delete(goals).where(and(eq(goals.id, id), eq(goals.userId, userId)));
+}
+
+// Investimentos
+export async function getUserInvestments(userId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(investments).where(eq(investments.userId, userId));
+}
+
+export async function createInvestment(data: InsertInvestment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(investments).values(data);
+}
+
+export async function updateInvestment(id: number, userId: string, data: Partial<Investment>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(investments).set(data).where(and(eq(investments.id, id), eq(investments.userId, userId)));
+}
+
+export async function deleteInvestment(id: number, userId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(investments).where(and(eq(investments.id, id), eq(investments.userId, userId)));
 }

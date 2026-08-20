@@ -16,6 +16,7 @@ import FixedAccounts from "./pages/FixedAccounts";
 import Installments from "./pages/Installments";
 import Categories from "./pages/Categories";
 import Goals from "./pages/Goals";
+import Investments from "./pages/Investments";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 
@@ -29,6 +30,7 @@ function Router() {
       <Route path={"/installments"} component={Installments} />
       <Route path={"/categories"} component={Categories} />
       <Route path={"/goals"} component={Goals} />
+      <Route path={"/investments"} component={Investments} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

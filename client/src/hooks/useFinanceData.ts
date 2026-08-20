@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Transaction, MonthlyData, CategoryExpense, InvestmentData, CATEGORY_COLORS } from '@/types/finance';
 import { trpc } from '@/lib/trpc';
 import { useMonth } from '@/contexts/MonthContext';
@@ -15,6 +15,7 @@ export function useFinanceData() {
   const { data: installmentsData = [], isLoading: installmentsLoading } = trpc.finance.installments.list.useQuery();
   const { data: fixedAccountsData = [], isLoading: fixedAccountsLoading } = trpc.finance.fixedAccounts.list.useQuery();
   const { data: goalsData = [], isLoading: goalsLoading } = trpc.finance.goals.list.useQuery();
+  const { data: investmentsData = [], isLoading: investmentsLoading } = trpc.finance.investments.list.useQuery();
 
   // Mutations — cada uma invalida a query correspondente para a UI refletir a mudança sem precisar recarregar a página
   const addTransactionMutation = trpc.finance.transactions.create.useMutation({
@@ -67,6 +68,31 @@ export function useFinanceData() {
     onSuccess: () => utils.finance.goals.list.invalidate(),
   });
 
+  const addInvestmentMutation = trpc.finance.investments.create.useMutation({
+    onSuccess: () => utils.finance.investments.list.invalidate(),
+  });
+  const updateInvestmentMutation = trpc.finance.investments.update.useMutation({
+    onSuccess: () => utils.finance.investments.list.invalidate(),
+  });
+  const deleteInvestmentMutation = trpc.finance.investments.delete.useMutation({
+    onSuccess: () => utils.finance.investments.list.invalidate(),
+  });
+
+  const seedCategoriesMutation = trpc.finance.categories.seedDefaults.useMutation({
+    onSuccess: () => utils.finance.categories.list.invalidate(),
+  });
+
+  // Na primeira vez que o usuário não tem NENHUMA categoria (conta nova, ou
+  // conta antiga de antes de existir esse seed), cria as categorias padrão
+  // como linhas reais — passam a ser editáveis/removíveis normalmente.
+  const seedAttempted = useRef(false);
+  useEffect(() => {
+    if (!categoriesLoading && categoriesData.length === 0 && !seedAttempted.current) {
+      seedAttempted.current = true;
+      seedCategoriesMutation.mutate();
+    }
+  }, [categoriesLoading, categoriesData.length, seedCategoriesMutation]);
+
   const allCategories = categoriesData;
 
   // Filtrar transações por mês e ano selecionado.
@@ -87,17 +113,19 @@ export function useFinanceData() {
     .filter(t => t.type === 'despesa')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
+  // Sem Math.abs aqui de propósito: resgate de investimento é lançado com
+  // valor negativo, e precisa REDUZIR o total investido, não aumentar.
   const investimentos = filteredTransactions
     .filter(t => t.type === 'investimento')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const saldo = receitas - despesas;
   const economia = receitas - despesas - investimentos;
 
-  // Calcular TOTAL investido de TODOS os meses e anos
+  // Calcular TOTAL investido de TODOS os meses e anos (líquido de resgates)
   const totalInvestido = transactionsData
     .filter(t => t.type === 'investimento')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .reduce((sum, t) => sum + t.amount, 0);
 
   // Calcular dados mensais dos últimos 6 meses
   const monthlyData: MonthlyData[] = [];
@@ -420,6 +448,71 @@ export function useFinanceData() {
     }
   }, [deleteGoalMutation]);
 
+  // Investimentos
+  const addInvestment = useCallback(async (data: { name: string; category: string }) => {
+    try {
+      await addInvestmentMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Erro ao adicionar investimento:', error);
+      throw error;
+    }
+  }, [addInvestmentMutation]);
+
+  const updateInvestment = useCallback(async (id: number, data: { name: string; category: string }) => {
+    try {
+      await updateInvestmentMutation.mutateAsync({ id, ...data });
+    } catch (error) {
+      console.error('Erro ao atualizar investimento:', error);
+      throw error;
+    }
+  }, [updateInvestmentMutation]);
+
+  const deleteInvestment = useCallback(async (id: number) => {
+    try {
+      await deleteInvestmentMutation.mutateAsync({ id });
+    } catch (error) {
+      console.error('Erro ao deletar investimento:', error);
+      throw error;
+    }
+  }, [deleteInvestmentMutation]);
+
+  // Aporte: transação de investimento com valor POSITIVO, ligada ao investimento.
+  const contributeToInvestment = useCallback(async (investmentId: number, amount: number, name: string, category: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      await addTransactionMutation.mutateAsync({
+        description: `Aporte: ${name}`,
+        category,
+        type: 'investimento',
+        amount,
+        date: today,
+        investmentId,
+      });
+    } catch (error) {
+      console.error('Erro ao aportar no investimento:', error);
+      throw error;
+    }
+  }, [addTransactionMutation]);
+
+  // Resgate: mesma coisa, mas com valor NEGATIVO — é isso que reduz o saldo
+  // do investimento e libera esse dinheiro de volta pro seu orçamento.
+  const withdrawFromInvestment = useCallback(async (investmentId: number, amount: number, name: string, category: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      await addTransactionMutation.mutateAsync({
+        description: `Resgate: ${name}`,
+        category,
+        type: 'investimento',
+        amount: -Math.abs(amount),
+        date: today,
+        investmentId,
+      });
+    } catch (error) {
+      console.error('Erro ao resgatar do investimento:', error);
+      throw error;
+    }
+  }, [addTransactionMutation]);
+
   // Contribuir com uma meta cria uma transação de investimento de verdade,
   // ligada a ela — mesmo padrão das contas fixas. O progresso nunca desalinha
   // da realidade porque é sempre a soma dessas transações, nunca um número solto.
@@ -451,6 +544,16 @@ export function useFinanceData() {
     return { ...goal, targetValue: target, currentValue, percentage };
   });
 
+  // Saldo de cada investimento = soma líquida (sem Math.abs) dos aportes e
+  // resgates ligados a ele — resgate é lançado com valor negativo.
+  const investmentsWithBalance = investmentsData.map((investment: any) => {
+    const linkedTransactions = transactionsData
+      .filter((t: any) => t.investmentId === investment.id)
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const balance = linkedTransactions.reduce((sum: number, t: any) => sum + t.amount, 0);
+    return { ...investment, balance, transactions: linkedTransactions };
+  });
+
   return {
     selectedMonth,
     selectedYear,
@@ -469,7 +572,8 @@ export function useFinanceData() {
     installments: installmentsData,
     fixedAccounts: fixedAccountsData,
     goals: goalsWithProgress,
-    isLoading: transactionsLoading || categoriesLoading || installmentsLoading || fixedAccountsLoading || goalsLoading,
+    investments: investmentsWithBalance,
+    isLoading: transactionsLoading || categoriesLoading || installmentsLoading || fixedAccountsLoading || goalsLoading || investmentsLoading,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -488,5 +592,10 @@ export function useFinanceData() {
     updateGoal,
     deleteGoal,
     contributeToGoal,
+    addInvestment,
+    updateInvestment,
+    deleteInvestment,
+    contributeToInvestment,
+    withdrawFromInvestment,
   };
 }

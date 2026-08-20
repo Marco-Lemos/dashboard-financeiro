@@ -40,6 +40,9 @@ export const transactions = pgTable("transactions", {
   // Preenchido quando a transação é uma contribuição pra uma meta financeira.
   // Progresso da meta = soma de tudo que aponta pra ela, mesma lógica das contas fixas.
   goalId: integer("goalId").references(() => goals.id, { onDelete: "set null" }),
+  // Preenchido quando a transação é um aporte ou resgate de um investimento
+  // específico. Valor negativo = resgate (retirada), positivo = aporte.
+  investmentId: integer("investmentId").references(() => investments.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -103,6 +106,18 @@ export const goals = pgTable("goals", {
 
 export type Goal = typeof goals.$inferSelect;
 export type InsertGoal = typeof goals.$inferInsert;
+
+export const investments = pgTable("investments", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 128 }).notNull(),
+  category: varchar("category", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Investment = typeof investments.$inferSelect;
+export type InsertInvestment = typeof investments.$inferInsert;
 
 // Relações
 export const usersRelations = relations(users, ({ many }) => ({

@@ -5,7 +5,7 @@
  */
 
 import { Link, useLocation } from 'wouter';
-import { BarChart3, List, FileText, Tags, CreditCard, Target, Moon, Sun, LogOut } from 'lucide-react';
+import { BarChart3, List, FileText, Tags, CreditCard, Target, TrendingUp, Moon, Sun, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/_core/hooks/useAuth';
@@ -16,6 +16,7 @@ const navItems = [
   { href: '/fixed-accounts', label: 'Contas', icon: FileText },
   { href: '/installments', label: 'Parcelas', icon: CreditCard },
   { href: '/goals', label: 'Metas', icon: Target },
+  { href: '/investments', label: 'Investir', icon: TrendingUp },
   { href: '/categories', label: 'Categorias', icon: Tags },
 ];
 
@@ -87,7 +88,7 @@ export function Navigation() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 backdrop-blur-xl bg-background/95"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-7">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
@@ -101,8 +102,8 @@ export function Navigation() {
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
+                <Icon className="w-[18px] h-[18px]" />
+                <span className="text-[9px] font-medium leading-none px-0.5 text-center">{item.label}</span>
               </Link>
             );
           })}

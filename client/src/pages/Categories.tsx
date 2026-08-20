@@ -1,6 +1,8 @@
 /**
  * Design: Glassmorphism Financeiro Sofisticado
- * Página de gerenciamento de categorias com padrões e customizadas
+ * Categorias — todas são linhas reais no banco (as padrão são semeadas
+ * automaticamente na primeira visita), então todas podem ser editadas ou
+ * removidas, sem distinção especial na tela.
  */
 
 import { useState } from 'react';
@@ -10,19 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Trash2, Edit2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, INVESTMENT_CATEGORIES, CATEGORY_COLORS } from '@/types/finance';
 import { useFinanceData } from '@/hooks/useFinanceData';
-
-// Categoria exibida na tela: pode ser uma categoria padrão (fixa, não editável)
-// ou uma categoria customizada, que agora vive no banco de dados (não mais no localStorage).
-interface DisplayCategory {
-  key: string;
-  id: number | null; // null = categoria padrão, não persistida no banco
-  name: string;
-  type: 'receita' | 'despesa' | 'investimento';
-  color: string;
-  isDefault: boolean;
-}
 
 export default function Categories() {
   const { allCategories, addCategory, updateCategory, deleteCategory } = useFinanceData();
@@ -36,35 +26,9 @@ export default function Categories() {
     color: '#10b981',
   });
 
-  const buildSection = (
-    type: 'receita' | 'despesa' | 'investimento',
-    defaults: readonly string[],
-    defaultColor: (name: string) => string
-  ): DisplayCategory[] => {
-    const defaultItems: DisplayCategory[] = defaults.map((name) => ({
-      key: `default-${type}-${name}`,
-      id: null,
-      name,
-      type,
-      color: defaultColor(name),
-      isDefault: true,
-    }));
-    const customItems: DisplayCategory[] = allCategories
-      .filter((c) => c.type === type)
-      .map((c) => ({
-        key: `custom-${c.id}`,
-        id: c.id,
-        name: c.name,
-        type,
-        color: c.color,
-        isDefault: false,
-      }));
-    return [...defaultItems, ...customItems];
-  };
-
-  const expenseCategories = buildSection('despesa', EXPENSE_CATEGORIES, (cat) => CATEGORY_COLORS[cat] || '#10B981');
-  const incomeCategories = buildSection('receita', INCOME_CATEGORIES, () => '#2563EB');
-  const investmentCategories = buildSection('investimento', INVESTMENT_CATEGORIES, (cat) => CATEGORY_COLORS[cat] || '#10B981');
+  const expenseCategories = allCategories.filter((c: any) => c.type === 'despesa');
+  const incomeCategories = allCategories.filter((c: any) => c.type === 'receita');
+  const investmentCategories = allCategories.filter((c: any) => c.type === 'investimento');
 
   const handleAddCategory = async () => {
     if (!newCategory.name) {
@@ -86,8 +50,7 @@ export default function Categories() {
     }
   };
 
-  const handleEdit = (category: DisplayCategory) => {
-    if (category.id === null) return; // categorias padrão não são editáveis
+  const handleEdit = (category: any) => {
     setEditingId(category.id);
     setEditValues({ name: category.name, color: category.color });
   };
@@ -106,8 +69,7 @@ export default function Categories() {
     }
   };
 
-  const handleDelete = async (id: number | null) => {
-    if (id === null) return; // categorias padrão não podem ser removidas
+  const handleDelete = async (id: number) => {
     try {
       await deleteCategory(id);
       toast.success('Categoria deletada!');
@@ -123,7 +85,7 @@ export default function Categories() {
     '#F7931A', '#00AA44', '#8B4513', '#D4A574'
   ];
 
-  const renderCategorySection = (title: string, categoryList: DisplayCategory[]) => (
+  const renderCategorySection = (title: string, categoryList: any[]) => (
     <div className="mb-12">
       <h2 className="text-2xl font-bold font-display mb-6">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -133,8 +95,8 @@ export default function Categories() {
           </div>
         ) : (
           categoryList.map((category) => (
-            <div key={category.key} className="glass-card rounded-2xl p-4">
-              {editingId === category.id && category.id !== null ? (
+            <div key={category.id} className="glass-card rounded-2xl p-4">
+              {editingId === category.id ? (
                 <div className="space-y-3">
                   <Input
                     value={editValues.name || ''}
@@ -175,33 +137,28 @@ export default function Categories() {
                     />
                     <div className="flex-1">
                       <h3 className="font-bold">{category.name}</h3>
-                      {category.isDefault && (
-                        <span className="text-xs text-muted-foreground">Padrão</span>
-                      )}
                     </div>
                   </div>
-                  {!category.isDefault && (
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleEdit(category)}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <Edit2 className="w-4 h-4 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(category.id)}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-red-500 hover:text-red-600"
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Deletar
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleEdit(category)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(category.id)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-red-500 hover:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Deletar
+                    </Button>
+                  </div>
                 </>
               )}
             </div>

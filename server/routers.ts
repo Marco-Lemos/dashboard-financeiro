@@ -21,6 +21,7 @@ export const appRouter = router({
         date: z.string().transform(s => new Date(s)),
         fixedAccountId: z.number().optional(),
         goalId: z.number().optional(),
+        investmentId: z.number().optional(),
       })).mutation(({ ctx, input }) => db.createTransaction({
         userId: ctx.user.id,
         description: input.description,
@@ -30,6 +31,7 @@ export const appRouter = router({
         date: input.date,
         fixedAccountId: input.fixedAccountId,
         goalId: input.goalId,
+        investmentId: input.investmentId,
       })),
       update: protectedProcedure.input(z.object({
         id: z.coerce.number(),
@@ -50,6 +52,7 @@ export const appRouter = router({
 
     categories: router({
       list: protectedProcedure.query(({ ctx }) => db.getUserCategories(ctx.user.id)),
+      seedDefaults: protectedProcedure.mutation(({ ctx }) => db.seedDefaultCategoriesIfEmpty(ctx.user.id)),
       create: protectedProcedure.input(z.object({
         name: z.string(),
         type: z.enum(["receita", "despesa", "investimento"]),
@@ -164,6 +167,27 @@ export const appRouter = router({
         targetYear: input.targetYear,
       })),
       delete: protectedProcedure.input(z.object({ id: z.coerce.number() })).mutation(({ ctx, input }) => db.deleteGoal(input.id, ctx.user.id)),
+    }),
+
+    investments: router({
+      list: protectedProcedure.query(({ ctx }) => db.getUserInvestments(ctx.user.id)),
+      create: protectedProcedure.input(z.object({
+        name: z.string(),
+        category: z.string(),
+      })).mutation(({ ctx, input }) => db.createInvestment({
+        userId: ctx.user.id,
+        name: input.name,
+        category: input.category,
+      })),
+      update: protectedProcedure.input(z.object({
+        id: z.coerce.number(),
+        name: z.string().optional(),
+        category: z.string().optional(),
+      })).mutation(({ ctx, input }) => db.updateInvestment(input.id, ctx.user.id, {
+        name: input.name,
+        category: input.category,
+      })),
+      delete: protectedProcedure.input(z.object({ id: z.coerce.number() })).mutation(({ ctx, input }) => db.deleteInvestment(input.id, ctx.user.id)),
     }),
   }),
 });

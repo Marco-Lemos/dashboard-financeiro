@@ -259,11 +259,18 @@ export default function Transactions() {
                             className="glass-card border-border"
                           />
                         ) : (
-                          <span className="font-bold" style={{
-                            color: transaction.type === 'receita' ? '#22c55e' : transaction.type === 'despesa' ? '#ef4444' : '#3b82f6'
-                          }}>
-                            {transaction.type === 'receita' ? '+' : '-'}R$ {(transaction.amount || transaction.value).toFixed(2)}
-                          </span>
+                        (() => {
+                          const raw = transaction.amount ?? transaction.value;
+                          const isNegative = raw < 0;
+                          const sign = transaction.type === 'receita' ? '+' : transaction.type === 'despesa' ? '-' : (isNegative ? '-' : '+');
+                          return (
+                            <span className="font-bold" style={{
+                              color: transaction.type === 'receita' ? '#22c55e' : transaction.type === 'despesa' ? '#ef4444' : '#3b82f6'
+                            }}>
+                              {sign}R$ {Math.abs(raw).toFixed(2)}
+                            </span>
+                          );
+                        })()
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
