@@ -28,6 +28,13 @@ const plugins = [
       ],
     },
     workbox: {
+      // Assume controle assim que ativado, em vez de esperar todas as abas
+      // antigas fecharem — reduz a janela em que uma versão antiga do app
+      // (já em cache) convive com o HTML/JS mais novo, que é justamente o
+      // tipo de descompasso que causa erros de DOM como o relatado.
+      clientsClaim: true,
+      skipWaiting: true,
+      cleanupOutdatedCaches: true,
       // Nunca cachear chamadas de API — dado financeiro sempre precisa vir
       // fresco da rede, nunca de um cache antigo.
       navigateFallbackDenylist: [/^\/api\//],
