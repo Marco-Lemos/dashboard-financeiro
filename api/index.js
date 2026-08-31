@@ -91,6 +91,12 @@ var transactions = pgTable("transactions", {
   // Assim dá pra saber, por mês, se aquela conta fixa já foi paga ou está em aberto,
   // sem precisar de um status estático (que não tinha noção de "pago em qual mês").
   fixedAccountId: integer("fixedAccountId").references(() => fixedAccounts.id, { onDelete: "set null" }),
+  // Preenchido quando a transação é uma contribuição pra uma meta financeira.
+  // Progresso da meta = soma de tudo que aponta pra ela, mesma lógica das contas fixas.
+  goalId: integer("goalId").references(() => goals.id, { onDelete: "set null" }),
+  // Preenchido quando a transação é um aporte ou resgate de um investimento
+  // específico. Valor negativo = resgate (retirada), positivo = aporte.
+  investmentId: integer("investmentId").references(() => investments.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
@@ -125,6 +131,24 @@ var installments = pgTable("installments", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
+var goals = pgTable("goals", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 128 }).notNull(),
+  targetValue: decimal("targetValue", { precision: 10, scale: 2 }).notNull(),
+  targetMonth: integer("targetMonth"),
+  targetYear: integer("targetYear"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+});
+var investments = pgTable("investments", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 128 }).notNull(),
+  category: varchar("category", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+});
 var usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   categories: many(categories),
@@ -155,6 +179,25 @@ var installmentsRelations = relations(installments, ({ one }) => ({
     references: [users.id]
   })
 }));
+
+// shared/defaultCategories.ts
+var DEFAULT_CATEGORIES = [
+  { name: "Alimenta\xE7\xE3o", type: "despesa", color: "#2563EB" },
+  { name: "Entretenimento", type: "despesa", color: "#7C3AED" },
+  { name: "Contas", type: "despesa", color: "#059669" },
+  { name: "Sa\xFAde", type: "despesa", color: "#DC2626" },
+  { name: "Transporte", type: "despesa", color: "#0891B2" },
+  { name: "Carro", type: "despesa", color: "#F59E0B" },
+  { name: "Educa\xE7\xE3o", type: "despesa", color: "#EA580C" },
+  { name: "Outros", type: "despesa", color: "#6B7280" },
+  { name: "Sal\xE1rio", type: "receita", color: "#2563EB" },
+  { name: "Freelance", type: "receita", color: "#2563EB" },
+  { name: "Outros", type: "receita", color: "#2563EB" },
+  { name: "BTC", type: "investimento", color: "#F7931A" },
+  { name: "A\xE7\xF5es", type: "investimento", color: "#00AA44" },
+  { name: "Terreno", type: "investimento", color: "#8B4513" },
+  { name: "Im\xF3vel", type: "investimento", color: "#D4A574" }
+];
 
 // server/db.ts
 var _db = null;
@@ -230,6 +273,16 @@ async function deleteCategory(id, userId) {
   if (!db) throw new Error("Database not available");
   return db.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
 }
+async function seedDefaultCategoriesIfEmpty(userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(categories).where(eq(categories.userId, userId)).limit(1);
+  if (existing.length > 0) return { seeded: false };
+  await db.insert(categories).values(
+    DEFAULT_CATEGORIES.map((c) => ({ userId, name: c.name, type: c.type, color: c.color }))
+  );
+  return { seeded: true };
+}
 async function getUserFixedAccounts(userId) {
   const db = await getDb();
   if (!db) return [];
@@ -275,6 +328,46 @@ async function completeOnboarding(userId) {
   if (!db) throw new Error("Database not available");
   return db.update(users).set({ onboardingCompleted: true }).where(eq(users.id, userId));
 }
+async function getUserGoals(userId) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(goals).where(eq(goals.userId, userId));
+}
+async function createGoal(data) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(goals).values(data);
+}
+async function updateGoal(id, userId, data) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(goals).set(data).where(and(eq(goals.id, id), eq(goals.userId, userId)));
+}
+async function deleteGoal(id, userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(goals).where(and(eq(goals.id, id), eq(goals.userId, userId)));
+}
+async function getUserInvestments(userId) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(investments).where(eq(investments.userId, userId));
+}
+async function createInvestment(data) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(investments).values(data);
+}
+async function updateInvestment(id, userId, data) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(investments).set(data).where(and(eq(investments.id, id), eq(investments.userId, userId)));
+}
+async function deleteInvestment(id, userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(investments).where(and(eq(investments.id, id), eq(investments.userId, userId)));
+}
 
 // server/routers.ts
 var appRouter = router({
@@ -292,7 +385,9 @@ var appRouter = router({
         type: z2.enum(["receita", "despesa", "investimento"]),
         amount: z2.number(),
         date: z2.string().transform((s) => new Date(s)),
-        fixedAccountId: z2.number().optional()
+        fixedAccountId: z2.number().optional(),
+        goalId: z2.number().optional(),
+        investmentId: z2.number().optional()
       })).mutation(({ ctx, input }) => createTransaction({
         userId: ctx.user.id,
         description: input.description,
@@ -300,7 +395,9 @@ var appRouter = router({
         type: input.type,
         value: input.amount.toString(),
         date: input.date,
-        fixedAccountId: input.fixedAccountId
+        fixedAccountId: input.fixedAccountId,
+        goalId: input.goalId,
+        investmentId: input.investmentId
       })),
       update: protectedProcedure.input(z2.object({
         id: z2.coerce.number(),
@@ -320,6 +417,7 @@ var appRouter = router({
     }),
     categories: router({
       list: protectedProcedure.query(({ ctx }) => getUserCategories(ctx.user.id)),
+      seedDefaults: protectedProcedure.mutation(({ ctx }) => seedDefaultCategoriesIfEmpty(ctx.user.id)),
       create: protectedProcedure.input(z2.object({
         name: z2.string(),
         type: z2.enum(["receita", "despesa", "investimento"]),
@@ -403,6 +501,54 @@ var appRouter = router({
         paidUntilYear: input.paidUntilYear
       })),
       delete: protectedProcedure.input(z2.object({ id: z2.coerce.number() })).mutation(({ ctx, input }) => deleteInstallment(input.id, ctx.user.id))
+    }),
+    goals: router({
+      list: protectedProcedure.query(({ ctx }) => getUserGoals(ctx.user.id)),
+      create: protectedProcedure.input(z2.object({
+        name: z2.string(),
+        targetValue: z2.string(),
+        targetMonth: z2.number().optional(),
+        targetYear: z2.number().optional()
+      })).mutation(({ ctx, input }) => createGoal({
+        userId: ctx.user.id,
+        name: input.name,
+        targetValue: input.targetValue,
+        targetMonth: input.targetMonth,
+        targetYear: input.targetYear
+      })),
+      update: protectedProcedure.input(z2.object({
+        id: z2.coerce.number(),
+        name: z2.string().optional(),
+        targetValue: z2.string().optional(),
+        targetMonth: z2.number().optional(),
+        targetYear: z2.number().optional()
+      })).mutation(({ ctx, input }) => updateGoal(input.id, ctx.user.id, {
+        name: input.name,
+        targetValue: input.targetValue,
+        targetMonth: input.targetMonth,
+        targetYear: input.targetYear
+      })),
+      delete: protectedProcedure.input(z2.object({ id: z2.coerce.number() })).mutation(({ ctx, input }) => deleteGoal(input.id, ctx.user.id))
+    }),
+    investments: router({
+      list: protectedProcedure.query(({ ctx }) => getUserInvestments(ctx.user.id)),
+      create: protectedProcedure.input(z2.object({
+        name: z2.string(),
+        category: z2.string()
+      })).mutation(({ ctx, input }) => createInvestment({
+        userId: ctx.user.id,
+        name: input.name,
+        category: input.category
+      })),
+      update: protectedProcedure.input(z2.object({
+        id: z2.coerce.number(),
+        name: z2.string().optional(),
+        category: z2.string().optional()
+      })).mutation(({ ctx, input }) => updateInvestment(input.id, ctx.user.id, {
+        name: input.name,
+        category: input.category
+      })),
+      delete: protectedProcedure.input(z2.object({ id: z2.coerce.number() })).mutation(({ ctx, input }) => deleteInvestment(input.id, ctx.user.id))
     })
   })
 });
