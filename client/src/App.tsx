@@ -19,12 +19,14 @@ import Goals from "./pages/Goals";
 import Investments from "./pages/Investments";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
+import Landing from "./pages/Landing";
 
 function Router() {
   useHashLocation();
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/dashboard"} component={Home} />
       <Route path={"/transactions"} component={Transactions} />
       <Route path={"/fixed-accounts"} component={FixedAccounts} />
       <Route path={"/installments"} component={Installments} />
@@ -37,8 +39,20 @@ function Router() {
   );
 }
 
+function PublicRouter() {
+  useHashLocation();
+  return (
+    <Switch>
+      <Route path={"/"} component={Landing} />
+      <Route path={"/login"} component={Login} />
+      <Route component={Landing} />
+    </Switch>
+  );
+}
+
 // Só libera a navegação normal depois que existe uma sessão válida do Supabase Auth.
-// Sem isso, qualquer pessoa acessaria as telas antes mesmo de logar.
+// Usuários não autenticados ficam nas rotas públicas; usuários autenticados
+// entram no painel normalmente.
 function AppShell() {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -51,7 +65,7 @@ function AppShell() {
   }
 
   if (!isAuthenticated) {
-    return <Login />;
+    return <PublicRouter />;
   }
 
   if (user && !user.onboardingCompleted) {
@@ -69,8 +83,6 @@ function AppShell() {
   );
 }
 
-// Mostra o recap animado uma vez por dia, por cima do painel (que já carrega
-// normalmente por baixo). Não bloqueia nada — some ao terminar ou ao pular.
 function StoryOverlay({ userId }: { userId: string }) {
   const [visible, setVisible] = useState(false);
   const [checked, setChecked] = useState(false);
